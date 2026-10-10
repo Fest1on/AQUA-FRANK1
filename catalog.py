@@ -51,13 +51,14 @@ BULK_DISCOUNTS = {
 BOTTLE_DEPOSIT = 400  # застава за новий бутель, якщо немає тари на обмін
 BOTTLE_EXCHANGE_PRICE = 0  # додаткова доплата не потрібна, якщо є тара на обмін
 
-# Акція для НОВИХ клієнтів: рівно 2 бутлі води 18,9 л за фіксовану суму.
-# Діє тільки при першому замовленні (перевіряється в database.has_previous_orders)
-# і тільки якщо в кошику РІВНО стільки бутлів, скільки вказано в required_qty.
+# Акція для НОВИХ клієнтів:
+# перші 2 бутлі по 100 грн, кожна наступна — 140 грн.
+# Тобто, 3 бутлі = 100 + 100 + 140 = 340 грн.
 NEW_CUSTOMER_PROMO = {
     "item_id": "water_189",
-    "required_qty": 2,
-    "promo_total": 200,  # разом за 2 шт (замість 140 × 2 = 280 грн)
+    "first_qty": 2,
+    "first_price": 100,
+    "next_price": 140,
 }
 
 
@@ -79,30 +80,68 @@ def line_total(item_id: str, qty: int) -> int:
     return unit_price(item_id, qty) * qty
 
 
+def promo_total_for_qty(qty: int) -> int:
+    """Сума за воду для нових клієнтів по акції: 2×100 + наступні ×140."""
+    promo = NEW_CUSTOMER_PROMO
+    first_qty = promo["first_qty"]
+    if qty <= first_qty:
+        return qty * promo["first_price"]
+    return first_qty * promo["first_price"] + (qty - first_qty) * promo["next_price"]
+
+
 def promo_applies(item_id: str, qty: int, is_new_customer: bool) -> bool:
     """Чи застосовується акція для нових клієнтів до цієї позиції кошика."""
     promo = NEW_CUSTOMER_PROMO
-    return is_new_customer and item_id == promo["item_id"] and qty == promo["required_qty"]
+    return is_new_customer and item_id == promo["item_id"] and qty > promo["first_qty"] - 1
 
 
-def promo_savings() -> int:
+def promo_savings(qty: int | None = None) -> int:
     promo = NEW_CUSTOMER_PROMO
-    regular = CATALOG[promo["item_id"]]["price"] * promo["required_qty"]
-    return regular - promo["promo_total"]
+    item_id = promo["item_id"]
+    if qty is None:
+        qty = promo["first_qty"] + 1
+    regular = CATALOG[item_id]["price"] * qty
+    return regular - promo_total_for_qty(qty)
 
 
 def item_line(item_id: str, qty: int, is_new_customer: bool) -> tuple[int, str]:
     """
     Повертає (сума за позицію, приписка для чека) з урахуванням акції для нових
-    клієнтів (має пріоритет над оптовою знижкою, якщо застосовується).
+    клієнтів. Акція має пріоритет над оптовою знижкою.
     """
     if promo_applies(item_id, qty, is_new_customer):
-        promo = NEW_CUSTOMER_PROMO
-        note = f" 🎉 Акція для нових клієнтів (знижка {promo_savings()} грн)"
-        return promo["promo_total"], note
+        promo_total = promo_total_for_qty(qty)
+        regular_total = CATALOG[item_id]["price"] * qty
+        savings = regular_total - promo_total
+        if qty == NEW_CUSTOMER_PROMO["first_qty"]:
+            note = f" 🎉 Акція для нових клієнтів (2 бутлі по 100 грн, знижка {savings} грн)"
+        else:
+            note = (
+                f" 🎉 Акція для нових клієнтів "
+                f"(2×100 + {qty - NEW_CUSTOMER_PROMO['first_qty']}×140 = {promo_total} грн, знижка {savings} грн)"
+            )
+        return promo_total, note
 
     total = line_total(item_id, qty)
     note = ""
     if unit_price(item_id, qty) != CATALOG[item_id]["price"]:
         note = f" (знижка: {unit_price(item_id, qty)} грн/шт)"
     return total, note
+
+
+__all__ = [
+    "CATALOG",
+    "CATEGORIES",
+    "BULK_DISCOUNTS",
+    "BOTTLE_DEPOSIT",
+    "BOTTLE_EXCHANGE_PRICE",
+    "NEW_CUSTOMER_PROMO",
+    "get_items_by_category",
+    "unit_price",
+    "line_total",
+    "promo_total_for_qty",
+    "promo_applies",
+    "promo_savings",
+    "item_line",
+]
+

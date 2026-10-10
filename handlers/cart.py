@@ -27,11 +27,11 @@ async def build_cart_text(user_id: int, cart: dict) -> tuple[str, int]:
 
     promo = NEW_CUSTOMER_PROMO
     water_qty = cart.get(promo["item_id"], 0)
-    if is_new_customer and water_qty != promo["required_qty"]:
+    if is_new_customer and water_qty > 1:
         text += (
-            f"\n\n🎁 <b>Акція для нових клієнтів:</b> {promo['required_qty']} бутлі води 18,9л "
-            f"за {promo['promo_total']} грн замість {CATALOG['water_189']['price'] * promo['required_qty']} грн "
-            f"(знижка {promo_savings()} грн)! Діє тільки на перше замовлення."
+            f"\n\n🎁 <b>Акція для нових клієнтів:</b> "
+            f"2 бутлі по 100 грн, а кожна наступна — 140 грн. "
+            f"Знижка для цього замовлення: {promo_savings(water_qty)} грн."
         )
 
     return text, total
@@ -82,3 +82,4 @@ async def clear_cart(callback: types.CallbackQuery):
     await db.clear_cart(callback.from_user.id)
     await callback.answer("Кошик очищено")
     await callback.message.edit_text("🛒 Ваш кошик порожній.")
+

@@ -28,10 +28,9 @@ async def show_category_items(message: types.Message, category_code: str):
         caption = f"🛍 <b>{html.escape(data['name'])}</b>\n💰 Ціна: {data['price']} грн"
         if is_new_customer and item_id == promo["item_id"]:
             caption += (
-                f"\n\n🎁 <b>Акція для нових клієнтів:</b> {promo['required_qty']} шт за "
-                f"{promo['promo_total']} грн (звичайна ціна — "
-                f"{data['price'] * promo['required_qty']} грн, знижка {promo_savings()} грн)!\n"
-                f"Діє тільки на перше замовлення рівно {promo['required_qty']} шт."
+                f"\n\n🎁 <b>Акція для нових клієнтів:</b> "
+                f"2 бутлі по 100 грн, а третя та наступні — по 140 грн.\n"
+                f"На перше замовлення при кількості від {promo['first_qty']} шт."
             )
         photo = data["photo"]
         try:
@@ -102,3 +101,4 @@ async def manual_qty_receive(message: types.Message, state: FSMContext):
     await db.add_to_cart(message.from_user.id, item_id, quantity)
     await state.clear()
     await message.answer(f"✅ Додано {quantity} шт. — {CATALOG[item_id]['name']}")
+
